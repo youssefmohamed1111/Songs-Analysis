@@ -1,0 +1,531 @@
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(reshape2)
+```
+
+```{r}
+# Load the dataset
+df <- read.csv("Popular_Spotify_Songs.csv")
+```
+
+```{r}
+# Show dataset description
+summary(df)
+```
+
+```{r}
+# Show the first few rows 
+head(df)
+
+```
+
+```{r}
+# Display information about the df structure
+str(df)
+```
+
+```{r}
+# view dimensions
+dim(df)
+```
+
+```{r}
+# column names
+names(df)
+```
+
+```{r}
+# Check for duplicate rows in the entire dfset
+duplicates <- df %>%
+  filter(duplicated(.) | duplicated(., fromLast = TRUE))
+  print(duplicates)
+```
+
+```{r}
+# Find NA and NULL values
+na_counts <- colSums(is.na(df))
+null_counts <- colSums(df == "")
+missing_counts <- na_counts + null_counts
+print(missing_counts[missing_counts > 0])
+```
+
+```{r}
+# Delete NULL/NA values
+empty_rows <- apply(df, 1, function(row) any(row == ""))
+df <- df[!empty_rows, ]
+```
+
+
+
+```{r}
+#check if null values are deleted
+na_counts <- colSums(is.na(df))
+null_counts <- colSums(df == "")
+missing_counts <- na_counts + null_counts
+print(missing_counts[missing_counts > 0])
+```
+
+```{r}
+dim(df)
+```
+
+```{r}
+# display all unique values in streams column
+print(unique(df$streams))
+```
+
+```{r}
+#remove row number 479
+df <- df[-479, ]
+dim (df)
+```
+
+```{r}
+# Convert selected columns to integer
+df <- df %>%
+  mutate(
+    #remove commas
+    in_shazam_charts = as.integer(gsub(",", "", in_shazam_charts)), 
+    in_deezer_charts = as.integer(gsub(",", "", in_deezer_charts)),
+    in_deezer_playlists = as.integer(gsub(",", "", in_deezer_playlists)),
+    streams = as.double(gsub(",", "", streams))
+  )
+str(df)
+```
+
+```{r}
+# Convert mode column to 1 and 0
+df$mode <- ifelse(df$mode == "Major", 1, 0)
+df$mode <- as.integer(df$mode)
+print(unique(df$mode))
+```
+
+```{r}
+# #  Hypothesis Testing (barra el manhag)
+# # Hypothesis: Songs with higher danceability percentages tend to have higher valence percentages
+# # Null Hypothesis (H0): There is no relationship between danceability percentages and valence percentages
+# # Alternative Hypothesis (H1): There is a positive relationship between danceability percentages and valence percentages
+# cor_test_result <- cor.test(df$`danceability_.`, df$`valence_.`)
+# print(cor_test_result)
+
+```
+
+```{r}
+
+# **ANOVA (Analysis of Variance)**:
+# 
+# *   Hypothesis: The mean energy levels differ across different years of song releases.
+#     *   Null Hypothesis (H0): There is no difference in mean energy levels across different years.
+#     *   Alternative Hypothesis (H1): There is a significant difference in mean energy levels across different years.
+# *   This ANOVA test is used to compare the means of energy levels across different years of song releases to determine if there are significant differences.
+
+
+#  install.packages("dplyr")
+
+library(dplyr)
+
+
+# Convert 'released_year' to a factor variable
+df$released_year <- as.factor(df$released_year)
+
+# Show the categories of the 'released_year' variable after converting it to a factor
+levels(df$released_year)
+
+
+# Perform ANOVA test
+anova_result <- aov(df$`energy_.` ~ df$`released_year`, data = df)
+
+# Summary of ANOVA test
+summary(anova_result)
+
+```
+```{r}
+# Remove non-numeric columns
+df_numeric <- df[, sapply(df, is.numeric)]
+
+# Split the data into training and testing sets ( 70% train, 30% test)
+set.seed(123)  # for reproducibility
+train_index <- sample(1:nrow(df_numeric), 0.7 * nrow(df_numeric))
+train_data <- df_numeric[train_index, ]
+test_data <- df_numeric[-train_index, ]
+
+```
+
+```{r}
+par(mfrow = c(3, 3))  # Set up a 3x3 grid for multiple plots
+for (i in 1:ncol(df_numeric)) {
+  hist(df_numeric[, i], main = colnames(df_numeric)[i], xlab = "", col = "skyblue")
+}
+```
+
+```{r}
+# Step 3: Correlation Analysis
+#install.packages("corrplot")
+
+library(corrplot)
+correlation_matrix <- cor(df_numeric)
+corrplot(correlation_matrix, method = "color")
+
+```
+
+```{r}
+# Step 4: Boxplots 
+par(mfrow = c(3, 3))  # Set up a 3x3 grid for multiple plots 
+for (i in 1:ncol(df_numeric)) { 
+  boxplot(df_numeric[, i], horizontal = TRUE, main = colnames(df_numeric)[i], col = "skyblue") 
+}
+```
+```{r}
+# Plotting
+# Assuming you have a dfframe named df_imputed
+# Load the dfset
+head(df)
+# Check column names
+names(df)
+
+# Rename columns
+random_sample_imputation <- function(df) {
+  columns_with_na <- names(df)[apply(df, 2, function(x) any(is.na(x)))]
+  for (var in columns_with_na) {
+    random_sample_df <- sample(df[!is.na(df[var]), var], sum(is.na(df[var])), replace = TRUE)
+    df[is.na(df[var]), var] <- random_sample_df
+  }
+  return(df)
+}
+
+# Assuming 'df' is your dfframe
+df_imputed <- random_sample_imputation(df)
+
+# Check for missing values after imputation
+colSums(is.na(df_imputed))
+
+names(df_imputed)[names(df_imputed) == 'released_year'] <- 'Year'
+names(df_imputed)[names(df_imputed) == 'released_month'] <- 'Month'
+names(df_imputed)[names(df_imputed) == 'released_day'] <- 'Day'
+
+# Convert to datetime
+df_imputed$df_of_release <- as.Date(with(df_imputed, paste(Year, Month, Day, sep = "-")), format = "%Y-%m-%d")
+
+# Remove unnecessary columns
+df_imputed <- subset(df_imputed, select = -c(Year, Month, Day))
+
+# Rename column
+names(df_imputed)[names(df_imputed) == 'artist.s._name'] <- 'artists_name'
+
+# Select relevant columns
+Top_artists <- df_imputed[, c('track_name', 'artists_name', 'df_of_release')]
+
+# Get top artists count
+Top_artists_count <- table(df_imputed$artists_name)
+Top_artists_count <- Top_artists_count[order(-Top_artists_count)]
+
+# Plotting
+barplot(head(Top_artists_count, 5), 
+        main = "Counts of Singers",
+        xlab = "Singer",
+        ylab = "Count")
+
+# Assuming you have a dfframe named df_imputed
+
+# Select relevant columns and convert 'streams' to numeric
+Top_songs <- df_imputed[, c('track_name', 'streams')]
+Top_songs$streams <- as.numeric(Top_songs$streams)
+
+# Filter out NA or non-numeric values
+Top_songs <- Top_songs[!is.na(Top_songs$streams), ]
+
+# Sort by 'streams' in descending order and select top 10
+Top <- head(Top_songs[order(-Top_songs$streams), ], 10)
+
+# Plotting
+library(ggplot2)
+library(dplyr)
+
+# Set plot size
+options(repr.plot.width=15, repr.plot.height=5)
+
+# Create bar plot
+ggplot(Top, aes(x = streams, y = reorder(track_name, streams))) + geom_bar(stat = "identity", fill = "darkgreen") +
+  labs(x = "Streams", y = "Songs", title = "Most Streamed Songs on Spotify") +
+  theme_minimal() +
+  theme(axis.text.y = element_text(size = 10)) +
+  coord_flip()
+```
+
+
+
+```{r}
+#randomForest
+#install.packages("randomForest")
+library(randomForest)
+
+
+# Train a regression model on the training data 
+model <- randomForest(streams ~ ., data = train_data)
+
+# Make predictions using the testing data
+predictions <- predict(model, newdata = test_data)
+
+#calculate RMSE
+rmse <- sqrt(mean((test_data$streams - predictions)^2))
+print(paste("RMSE:", rmse))
+
+target_range <- max(train_data$streams) - min(train_data$streams)
+
+# Calculate the average error rate as a percentage
+average_error_rate <- (rmse / target_range) * 100
+
+cat("The average error rate of the RF model is approximately", round(average_error_rate, 2), "% of the target variable's range.")
+```
+
+```{r}
+library(ggplot2)
+# Create a data frame
+results_df <- data.frame(Actual =test_data$streams, Predicted = predictions)
+
+# Plot the graph
+ggplot(results_df, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add a diagonal line for reference
+  labs(x = "Actual", y = "Predicted", title = "Actual vs Predicted Results") +
+  theme_minimal()
+```
+
+```{r}
+##Ridge linear
+
+# Install glmnet package (if not already installed)
+#install.packages("glmnet")
+
+# Load glmnet package
+library(glmnet)
+
+
+X_train <- train_data[, -which(names(train_data) == "streams")]
+y_train <- train_data$streams
+
+# Remove the target variable from the test dataset
+X_test <- test_data[, -which(names(test_data) == "streams")]
+
+# Extract the target variable from the test dataset
+y_test <- test_data$streams
+
+#RM 
+ridge_model <- glmnet(as.matrix(X_train), y_train, alpha = 0)
+
+# Make predictions on the test set
+predictions <- predict(ridge_model, newx = as.matrix(X_test))
+# For example, calculate RMSE
+rmse <- sqrt(mean((test_data$streams - predictions)^2))
+print(paste("RMSE:", rmse))
+
+target_range <- max(train_data$streams) - min(train_data$streams)
+
+# Calculate the average error rate as a percentage
+average_error_rate <- (rmse / target_range) * 100
+
+cat("The average error rate of the Ridge regression model is approximately", round(average_error_rate, 2), "% of the target variable's range.")
+```
+
+```{r}
+# Train linear regression  model on the training data
+model <- lm(streams ~ ., data = train_data)
+
+# Make predictions on the test data
+predictions <- predict(model, newdata = test_data)
+
+# Evaluate model performance
+
+# Calculate Root Mean Squared Error (RMSE)
+rmse <- sqrt(mean((test_data$streams - predictions)^2))
+rmse
+
+target_range <- max(train_data$streams) - min(train_data$streams)
+
+# Calculate the average error rate as a percentage
+average_error_rate <- (rmse / target_range) * 100
+
+cat("The average error rate of the  Linear regression is approximately", round(average_error_rate, 2), "% of the target variable's range.")
+```
+
+```{r}
+library(ggplot2)
+# Create a data frame
+results_df <- data.frame(Actual =test_data$streams, Predicted = predictions)
+
+# Plot the graph
+ggplot(results_df, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add a diagonal line for reference
+  labs(x = "Actual", y = "Predicted", title = "Actual vs Predicted Results") +
+  theme_minimal()
+```
+
+
+```{r}
+# Install ggplot2 package (if not already installed)
+#install.packages("ggplot2")
+
+# Load ggplot2 package
+library(ggplot2)
+
+
+# Create a density plot to visualize the distribution of the "streams" column
+ggplot(df, aes(x = streams)) +
+  geom_density(fill = "skyblue", color = "black") +
+  labs(title = "Density Plot of Streams",
+       x = "Streams",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+```{r}
+#install.packages("e1071")
+
+# Load necessary library
+library(e1071)
+
+# Calculate skewness of the streams column
+skew <- skewness(df$streams)
+
+# Print the skewness value
+cat("Skewness of the 'streams' column:", skew, "\n")
+```
+
+```{r}
+# Interpret the skewness value
+if (skew < -1) {
+  cat("The distribution is highly negatively skewed (left-skewed).\n")
+} else if (skew > 1) {
+  cat("The distribution is highly positively skewed (right-skewed).\n")
+} else if (abs(skew) <= 1) {
+  cat("The distribution is approximately symmetric (not skewed).\n")
+}
+```
+
+```{r}
+# Create a density plot to visualize the transformed distribution
+ggplot(df, aes(x = log(df$streams))) +
+  geom_density(fill = "skyblue", color = "black") +
+  labs(title = "Density Plot of Log-transformed Streams",
+       x = "Log(Streams)",
+       y = "Density") +
+  theme_minimal()
+
+```
+
+
+```{r}
+skew <- skewness(log(df$streams))
+
+# Print the skewness value
+cat("Skewness of the 'streams' column:", skew, "\n")
+```
+```{r}
+# Interpret the skewness value
+if (skew < -1) {
+  cat("The distribution is highly negatively skewed (left-skewed).\n")
+} else if (skew > 1) {
+  cat("The distribution is highly positively skewed (right-skewed).\n")
+} else if (abs(skew) <= 1) {
+  cat("The distribution is approximately symmetric (not skewed).\n")
+}
+```
+
+
+```{r}
+# Apply logarithmic transformation to the "streams" column
+train_data$log_streams <- log(train_data$streams)
+test_data$log_streams <- log(test_data$streams)
+```
+
+
+```{r}
+# Fit a linear regression model using transformed training data
+model <- lm(log_streams ~ ., data = train_data)
+
+#Evaluate the model using transformed test data
+predictions <- exp(predict(model, newdata = test_data))  # Transform back to original scale
+actual_values <- test_data$streams
+
+# Calculate RMSE
+rmse <- sqrt(mean((predictions - actual_values)^2))
+cat("RMSE:", rmse, "\n")
+
+target_range <- max(train_data$streams) - min(train_data$streams)
+
+# Calculate the average error rate as a percentage
+average_error_rate <- (rmse / target_range) * 100
+
+cat("The average error rate of the RF model is approximately", round(average_error_rate, 2), "% of the target variable's range.")
+```
+```{r}
+library(ggplot2)
+# Create a data frame
+results_df <- data.frame(Actual =actual_values, Predicted = predictions)
+
+# Plot the graph
+ggplot(results_df, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add a diagonal line for reference
+  labs(x = "Actual", y = "Predicted", title = "Actual vs Predicted Results") +
+  theme_minimal()
+
+```
+
+
+```{r}
+#(Best accuracy using RM ft log)
+
+# Install randomForest package (if not already installed)
+#install.packages("randomForest")
+
+# Load randomForest package
+library(randomForest)
+
+# Fit a linear regression model using transformed training data
+model <- randomForest(log_streams ~ ., data = train_data)
+
+# Evaluate the model using transformed test data
+predictions <- exp(predict(model, newdata = test_data))  # Transform back to original scale
+actual_values <- test_data$streams
+
+# Calculate RMSE
+rmse <- sqrt(mean((predictions - actual_values)^2))
+cat("RMSE:", rmse, "\n")
+
+target_range <- max(train_data$streams) - min(train_data$streams)
+
+# Calculate the average error rate as a percentage
+average_error_rate <- (rmse / target_range) * 100
+
+cat("The average error rate of the RF model is approximately", round(average_error_rate, 2), "% of the target variable's range.")
+
+# Get feature importance
+importance_rf <- importance(model)
+# Plot feature importance
+varImpPlot(model)
+
+# Order attributes based on importance scores
+ordered_importance <- importance_rf[order(importance_rf, decreasing = TRUE), ]
+print(ordered_importance)
+
+```
+```{r}
+
+library(ggplot2)
+# Create a data frame
+results_df <- data.frame(Actual =actual_values, Predicted = predictions)
+
+# Plot the graph
+ggplot(results_df, aes(x = Actual, y = Predicted)) +
+  geom_point(color = "blue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +  # Add a diagonal line for reference
+  labs(x = "Actual", y = "Predicted", title = "Actual vs Predicted Results") +
+  theme_minimal()
+
+```
+
